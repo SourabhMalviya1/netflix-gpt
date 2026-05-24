@@ -1,10 +1,77 @@
 import Header from "./Header";
-import { useState } from "react";
+import { useRef, useState } from "react";
+import checkValidData from "../utils/validate";
+import {
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
+import { auth } from "../utils/firebase";
+import { useDispatch } from "react-redux";
+import { addUser } from "../utils/userSlice";
 
 const Login = () => {
   const [isSignIn, setIsSignIn] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(null);
+  const name = useRef(null);
+  const email = useRef(null);
+  const password = useRef(null);
+  const dispatch = useDispatch();
   const toggleSignInForm = () => {
     setIsSignIn(!isSignIn);
+  };
+
+  const handleButtonClick = (e) => {
+    const errorMessage = checkValidData(
+      email.current.value,
+      password.current.value,
+      name.current?.value,
+    );
+    setErrorMessage(errorMessage);
+    if (errorMessage) return;
+
+    if (!isSignIn) {
+      createUserWithEmailAndPassword(
+        auth,
+        email.current.value,
+        password.current.value,
+      )
+        .then((userCredential) => {
+          // Signed up
+          // const user = userCredential.user;
+          updateProfile(auth.currentUser, {
+            displayName: name.current?.value,
+          })
+            .then(() => {
+              const { uid, email, displayName } = auth.currentUser;
+              dispatch(
+                addUser({ uid: uid, email: email, displayName: displayName }),
+              );
+            })
+            .catch((error) => {
+              setErrorMessage(error.code + ": " + error.message);
+            });
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          setErrorMessage(errorCode + ": " + errorMessage);
+        });
+    } else {
+      signInWithEmailAndPassword(
+        auth,
+        email.current.value,
+        password.current.value,
+      )
+        .then((userCredential) => {
+          // const user = userCredential.user;
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          setErrorMessage(errorCode + ": " + errorMessage);
+        });
+    }
   };
   return (
     <div>
@@ -16,6 +83,9 @@ const Login = () => {
         />
       </div>
       <form
+        onSubmit={(e) => {
+          e.preventDefault();
+        }}
         className="text-white w-4/12 p-12 bg-black absolute my-36 mx-auto right-0 left-0
       rounded-lg bg-opacity-80"
       >
@@ -23,6 +93,7 @@ const Login = () => {
           {isSignIn ? "Sign In" : "Sign Up"}
         </h1>
         <input
+          ref={email}
           type="text"
           placeholder="Email Address"
           className="p-4 my-2 w-full bg-gray-600"
@@ -32,15 +103,22 @@ const Login = () => {
           <input
             type="text"
             placeholder="Full Name"
+            ref={name}
             className="p-4 my-2 w-full bg-gray-600"
           />
         )}
         <input
+          ref={password}
           type="password"
           placeholder="Password"
           className="p-4 my-2 w-full bg-gray-600"
         />
-        <button type="submit" className="p-4 my-4 bg-red-700 w-full rounded-lg">
+        <p className="text-red-500">{errorMessage}</p>
+        <button
+          onClick={handleButtonClick}
+          type="submit"
+          className="p-4 my-4 bg-red-700 w-full rounded-lg"
+        >
           {isSignIn ? "Sign In" : "Sign Up"}
         </button>
         <p className="text-gray-400 cursor-pointer" onClick={toggleSignInForm}>
